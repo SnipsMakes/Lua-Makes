@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lua Makes — script AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0C0C11; --panel:#18171F; --panel-2:#211F2A; --ink:#F5F3F8; --ink-soft:#9591A3;
+    --line:#2A2833; --pink:#FF4FA3; --purple:#8B5CF6; --err:#FF6B6B;
+    --gradient: linear-gradient(135deg, #FF9A6C 0%, #FF4FA3 40%, #B23BFF 75%, #6C4CFF 100%);
+    box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font-family:'Space Grotesk',sans-serif; display:flex; justify-content:center; }
+  .app { width:100%; max-width:680px; height:100%; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+  .app::before {
+    content:''; position:absolute; top:-120px; left:50%; transform:translateX(-50%);
+    width:340px; height:340px; border-radius:50%; background:var(--gradient);
+    filter:blur(70px); opacity:0.35; pointer-events:none; z-index:0;
+  }
+
+  header { position:relative; z-index:1; padding:14px 16px 10px; border-top:env(safe-area-inset-top,0px) solid transparent; display:flex; align-items:center; justify-content:space-between; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .mark { width:36px; height:36px; border-radius:50%; background:var(--gradient); flex-shrink:0; box-shadow:0 0 0 1px rgba(255,255,255,0.08); }
+  h1 { font-size:16px; margin:0; font-weight:700; }
+  .sub { color:var(--ink-soft); font-size:11.5px; margin-top:2px; }
+  .icon-btn { background:var(--panel); border:1px solid var(--line); color:var(--ink-soft); width:36px; height:36px; border-radius:50%; font-size:15px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .icon-btn:hover { border-color:var(--pink); color:var(--ink); }
+  .header-btns { display:flex; gap:8px; }
+
+  /* Tabs */
+  #tabbar { position:relative; z-index:1; display:flex; gap:8px; padding:6px 16px 12px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #tabbar::-webkit-scrollbar { display:none; }
+  .tab { display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink-soft); font-size:12px; white-space:nowrap; cursor:pointer; flex-shrink:0; max-width:150px; }
+  .tab span.label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tab.active { border-color:transparent; color:#1A0F17; background:var(--gradient); font-weight:500; }
+  .tab .close, .tab .rename { opacity:0.55; font-size:11.5px; line-height:1; padding:0 1px; }
+  .tab .close:hover { opacity:1; color:var(--err); }
+  .tab .rename:hover { opacity:1; color:var(--pink); }
+  .tab.new { color:var(--pink); font-weight:600; border-style:dashed; }
+  .tab-rename-input {
+    background:transparent; border:none; border-bottom:1px solid currentColor; color:inherit;
+    font-family:inherit; font-size:12px; width:100px; padding:0; outline:none;
+  }
+
+  #settings { position:relative; z-index:1; display:none; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--panel); gap:9px; flex-direction:column; margin:0 16px 4px; border-radius:16px; }
+  #settings.open { display:flex; }
+  #settings label { font-size:11.5px; color:var(--ink-soft); }
+  #settings input, #settings textarea { background:var(--bg); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px 12px; font-family:'JetBrains Mono',monospace; font-size:12.5px; }
+  #settings textarea { resize:vertical; }
+  #settings .note { font-size:11px; color:var(--ink-soft); line-height:1.5; }
+  #settings .save-btn { align-self:flex-start; background:var(--gradient); color:#1A0F17; border:none; font-weight:700; font-size:12.5px; padding:8px 16px; border-radius:999px; cursor:pointer; }
+
+  #log { position:relative; z-index:1; flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+  .msg { max-width:86%; display:flex; flex-direction:column; gap:4px; }
+  .msg.user { align-self:flex-end; align-items:flex-end; }
+  .msg.lua, .msg.sys { align-self:flex-start; align-items:flex-start; }
+  .tag { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); padding:0 4px; }
+  .bubble { padding:11px 15px; border-radius:18px; line-height:1.55; font-size:14px; }
+  .msg.user .bubble { background:var(--gradient); color:#1A0F17; font-weight:500; border-bottom-right-radius:5px; }
+  .msg.lua .bubble { background:var(--panel); border:1px solid var(--line); border-bottom-left-radius:5px; }
+  .msg.sys .bubble { background:transparent; border:1px dashed var(--err); color:var(--err); font-size:12.5px; }
+  .bubble p { margin:0 0 8px; }
+  .bubble p:last-child { margin-bottom:0; }
+
+  .code-block { margin:8px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#0A0A0E; }
+  .code-head { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#151319; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ink-soft); }
+  .copy-btn { background:none; border:1px solid var(--line); color:var(--ink-soft); font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:4px 9px; border-radius:999px; cursor:pointer; }
+  .copy-btn:hover { color:#fff; border-color:var(--pink); background:rgba(255,79,163,0.12); }
+  .copy-btn.copied { color:var(--pink); border-color:var(--pink); }
+  pre { margin:0; padding:12px; overflow-x:auto; }
+  pre code { font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.55; color:#D8D4E3; white-space:pre; }
+
+  form { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:10px 16px; padding-bottom:calc(14px + env(safe-area-inset-bottom,0px)); }
+  textarea#input { flex:1; resize:none; border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:999px; padding:12px 18px; font-family:inherit; font-size:16px; line-height:1.3; max-height:110px; }
+  textarea#input:focus { outline:none; border-color:var(--pink); }
+  button[type=submit] {
+    background:var(--gradient); color:#1A0F17; border:none; border-radius:50%;
+    width:46px; height:46px; font-weight:700; font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  button:disabled { opacity:0.5; cursor:default; }
+
+  .empty { margin:auto; text-align:center; color:var(--ink-soft); font-size:13.5px; max-width:320px; line-height:1.6; padding:20px 0; }
+  .empty .headline { font-size:19px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; text-align:left; }
+  .card { border:1px solid var(--line); background:var(--panel); border-radius:16px; padding:14px; cursor:pointer; }
+  .card .ci { width:30px; height:30px; border-radius:9px; background:var(--gradient); margin-bottom:10px; }
+  .card .ct { font-size:13px; color:var(--ink); font-weight:500; }
+  .card:hover { border-color:var(--pink); }
+  @media (max-width:480px){
+    .msg{max-width:94%;}
+    h1{font-size:15px;}
+    .sub{font-size:10.5px;}
+    .tag{font-size:9px;}
+    .bubble{font-size:13px;padding:9px 13px;}
+    .tab{font-size:11px;padding:6px 10px;max-width:110px;}
+    .empty .headline{font-size:16.5px;}
+    .empty{font-size:12.5px;}
+    .card .ct{font-size:12px;}
+    .card{padding:11px;}
+    pre code{font-size:11px;}
+    .code-head{font-size:10px;}
+    .copy-btn{font-size:10px;padding:3px 8px;}
+    #settings label{font-size:11px;}
+    #settings .note{font-size:10.5px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1 id="headerTitle">Lua Makes</h1>
+        <div class="sub" id="headerSub">script writer</div>
+      </div>
+    </div>
+    <div class="header-btns">
+      <button class="icon-btn" id="settingsBtn" title="Settings">⋯</button>
+    </div>
+  </header>
+
+  <div id="tabbar"></div>
+
+  <div id="settings">
+    <label for="apiKey">Groq API key</label>
+    <input id="apiKey" type="password" placeholder="gsk_...">
+    <label for="sysPrompt" style="margin-top:2px;">Instructions (write your own — this fully replaces Lua's behavior)</label>
+    <textarea id="sysPrompt" rows="5"></textarea>
+    <div class="note">Stored only in this browser (localStorage), sent only to api.groq.com. Never commit a real key into a public repo — anyone loading this page can read it from the browser.</div>
+    <button class="save-btn" id="saveKeyBtn">Save</button>
+  </div>
+
+  <div id="log"></div>
+
+  <form id="form">
+    <textarea id="input" rows="1" placeholder="Describe the script you need…"></textarea>
+    <button type="submit" id="send">➤</button>
+  </form>
+</div>
+
+<script>
+const log = document.getElementById('log');
+const form = document.getElementById('form');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const settingsPanel = document.getElementById('settings');
+const settingsBtn = document.getElementById('settingsBtn');
+const apiKeyInput = document.getElementById('apiKey');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const sysPromptInput = document.getElementById('sysPrompt');
+const tabbar = document.getElementById('tabbar');
+const headerSub = document.getElementById('headerSub');
+
+function makeId() {
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+window.addEventListener('error', (e) => {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#3a0f14;color:#ffb3b3;font-family:monospace;font-size:11px;padding:8px 12px;z-index:999;';
+  box.textContent = 'Script error: ' + e.message + ' (line ' + e.lineno + ')';
+  document.body.appendChild(box);
+});
+
+const DEFAULT_SYSTEM = "You are Lua, the engine behind Lua Makes. You only write scripts: bash, python, javascript, automation, one-liners, cron jobs, glue code, whatever gets a job done on a computer. Default to giving a working script first in a fenced code block tagged with its language, then a short explanation after.";
+
+const KEY_KEY = 'luaMakes_apiKey';
+const SYS_KEY = 'luaMakes_systemPrompt';
+const CONVOS_KEY = 'luaMakes_conversations';
+const ACTIVE_KEY = 'luaMakes_activeId';
+
+apiKeyInput.value = localStorage.getItem(KEY_KEY) || '';
+sysPromptInput.value = localStorage.getItem(SYS_KEY) ?? DEFAULT_SYSTEM;
+
+// --- Conversations (tabs) ---------------------------------------------
+function loadConvos() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CONVOS_KEY) || 'null');
+    if (raw && raw.length) return raw;
+  } catch (e) {}
+  let migrated = [];
+  try {
+    const old = JSON.parse(localStorage.getItem('luaMakes_history') || '[]');
+    if (old.length) migrated = old;
+  } catch (e) {}
+  return [{ id: makeId(), title: 'New chat', history: migrated }];
+}
+let convos = loadConvos();
+let activeId = localStorage.getItem(ACTIVE_KEY);
+if (!convos.find(c => c.id === activeId)) activeId = convos[0].id;
+
+function saveConvos() {
+  localStorage.setItem(CONVOS_KEY, JSON.stringify(convos));
+  localStorage.setItem(ACTIVE_KEY, activeId);
+}
+function activeConvo() { return convos.find(c => c.id === activeId); }
+
+function renderTabs() {
+  tabbar.innerHTML = '';
+  convos.forEach(c => {
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (c.id === activeId ? ' active' : '');
+    tab.innerHTML = `<span class="label">${escapeHtml(c.title)}</span><span class="rename" title="Rename">✎</span><span class="close" data-id="${c.id}">✕</span>`;
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('close') || e.target.classList.contains('rename')) return;
+      activeId = c.id;
+      saveConvos();
+      renderTabs();
+      renderLog();
+    });
+    const startRename = (e) => {
+      e.stopPropagation();
+      const labelEl = tab.querySelector('.label');
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = c.title;
+      inp.className = 'tab-rename-input';
+      inp.addEventListener('click', ev => ev.stopPropagation());
+      inp.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') inp.blur();
+        if (ev.key === 'Escape') { inp.value = c.title; inp.blur(); }
+      });
+      inp.addEventListener('blur', () => {
+        c.title = inp.value.trim() || c.title;
+        saveConvos();
+        renderTabs();
+      });
+      labelEl.replaceWith(inp);
+      inp.focus();
+      inp.select();
+    };
+    tab.querySelector('.label').addEventListener('dblclick', startRename);
+    tab.querySelector('.rename').addEventListener('click', startRename);
+    tab.querySelector('.close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      convos = convos.filter(x => x.id !== c.id);
+      if (!convos.length) convos = [{ id: makeId(), title: 'New chat', history: [] }];
+      if (activeId === c.id) activeId = convos[0].id;
+      saveConvos();
+      renderTabs();
+      renderLog();
+    });
+    tabbar.appendChild(tab);
+  });
+  const add = document.createElement('div');
+  add.className = 'tab new';
+  add.textContent = '+ New';
+  add.addEventListener('click', () => {
+    const c = { id: makeId(), title: 'New chat', history: [] };
+    convos.push(c);
+    activeId = c.id;
+    saveConvos();
+    renderTabs();
+    renderLog();
+  });
+  tabbar.appendChild(add);
+  headerSub.textContent = (activeConvo() && activeConvo().title) || 'script writer';
+}
+
+// --- Rendering -----------------------------------------------------------
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderMessage(text) {
+  const parts = text.split('```');
+  let html = '';
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      let lines = part.split('\n');
+      let lang = '';
+      if (lines[0] && /^[a-zA-Z0-9_+-]{1,20}$/.test(lines[0].trim())) lang = lines.shift().trim();
+      const code = lines.join('\n').replace(/^\n/,'').replace(/\n$/,'');
+      html += `<div class="code-block"><div class="code-head"><span>${lang || 'script'}</span><button type="button" class="copy-btn">copy</button></div><pre><code>${escapeHtml(code)}</code></pre></div>`;
+    } else if (part.trim()) {
+      html += `<p>${escapeHtml(part.trim()).replace(/\n/g,'<br>')}</p>`;
+    }
+  });
+  return html || escapeHtml(text);
+}
+
+log.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  const code = btn.closest('.code-block').querySelector('code').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500);
+  });
+});
+
+function showEmptyState() {
+  log.innerHTML = `<div class="empty">
+      <div class="headline">Create, build, ship</div>
+      Tell Lua what script you need and it'll write it.
+      <div class="cards">
+        <div class="card" data-p="Write a bash script that backs up a folder to a timestamped zip"><div class="ci"></div><div class="ct">Backup script</div></div>
+        <div class="card" data-p="Python script to rename all files in a folder by stripping spaces"><div class="ci"></div><div class="ct">Batch rename</div></div>
+        <div class="card" data-p="A JS snippet to debounce a search input"><div class="ci"></div><div class="ct">Debounce input</div></div>
+        <div class="card" data-p="A cron-ready script to email me when a website goes down"><div class="ci"></div><div class="ct">Uptime check</div></div>
+      </div>
+    </div>`;
+  log.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => { input.value = c.dataset.p; form.requestSubmit(); }));
+}
+
+function addMessageEl(role, text) {
+  if (log.querySelector('.empty')) log.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const tagText = role === 'user' ? 'you' : (role === 'sys' ? 'notice' : 'lua');
+  wrap.innerHTML = `<div class="tag">${tagText}</div><div class="bubble">${renderMessage(text)}</div>`;
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+  return wrap.querySelector('.bubble');
+}
+
+function renderLog() {
+  const convo = activeConvo();
+  if (!convo || !convo.history.length) { showEmptyState(); return; }
+  log.innerHTML = '';
+  convo.history.forEach(m => addMessageEl(m.role, m.content));
+}
+
+// --- Settings --------------------------------------------------------
+settingsBtn.addEventListener('click', () => settingsPanel.classList.toggle('open'));
+saveKeyBtn.addEventListener('click', () => {
+  localStorage.setItem(KEY_KEY, apiKeyInput.value.trim());
+  localStorage.setItem(SYS_KEY, sysPromptInput.value);
+  settingsPanel.classList.remove('open');
+});
+
+// --- Init --------------------------------------------------------------
+renderTabs();
+renderLog();
+
+input.addEventListener('input', () => { input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,110)+'px'; });
+input.addEventListener('keydown', (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+
+  const apiKey = apiKeyInput.value.trim() || localStorage.getItem(KEY_KEY) || '';
+  if (apiKey) localStorage.setItem(KEY_KEY, apiKey);
+  localStorage.setItem(SYS_KEY, sysPromptInput.value);
+
+  if (!apiKey) {
+    settingsPanel.classList.add('open');
+    addMessageEl('sys', 'Add your Anthropic API key above, then hit send again.');
+    apiKeyInput.focus();
+    return;
+  }
+
+  input.value = ''; input.style.height = 'auto';
+  sendBtn.disabled = true;
+
+  const convo = activeConvo();
+  addMessageEl('user', text);
+  convo.history.push({ role:'user', content:text });
+  if (convo.title === 'New chat') convo.title = text.slice(0, 28) + (text.length > 28 ? '…' : '');
+  saveConvos();
+  renderTabs();
+
+  const bubble = addMessageEl('lua', '…');
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify({
+        model:'openai/gpt-oss-120b',
+        max_tokens:1500,
+        messages: [
+          { role:'system', content: sysPromptInput.value || DEFAULT_SYSTEM },
+          ...convo.history.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role:m.role, content:m.content }))
+        ]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
+    const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim() || '(empty response)';
+    bubble.innerHTML = renderMessage(reply);
+    convo.history.push({ role:'assistant', content:reply });
+    saveConvos();
+  } catch (err) {
+    bubble.parentElement.classList.add('sys');
+    bubble.textContent = 'Error: ' + err.message;
+  } finally {
+    sendBtn.disabled = false;
+    log.scrollTop = log.scrollHeight;
+  }
+});
+</script>
+</body>
+</html>
